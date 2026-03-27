@@ -1,0 +1,1192 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Panel Loggy24 | Gestión de Novedades</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      /* COLOR PRINCIPAL MORADO */
+      --primary-purple: #60269e; 
+      
+      /* Variables para compatibilidad interna */
+      --primary-yellow: #ff671d; 
+      
+      --primary-black: #ffffff;
+      --white: #000000;
+      --gray-100: #f8f9fa;
+      --gray-200: #212529;
+      --gray-300: #dee2e6;
+      --gray-400: #000000;
+      --gray-500: #adb5bd;
+      --gray-600: #6c757d;
+      --gray-700: #000000;
+      --gray-800: #343a40;
+      --gray-900: #212529;
+      --sidebar-width: 280px;
+      --sidebar-collapsed-width: 80px;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background-color: var(--gray-100); color: var(--gray-900); line-height: 1.6; }
+    .app-container { display: flex; min-height: 100vh; position: relative; }
+    
+    /* --- SIDEBAR --- */
+    .sidebar { 
+      position: fixed; 
+      top: 0; 
+      left: 0; 
+      width: var(--sidebar-width); 
+      height: 100vh; 
+      background: var(--primary-black); 
+      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
+      z-index: 1000; 
+      box-shadow: 4px 0 10px rgba(0, 0, 0, 0.1); 
+      overflow-y: auto; 
+      overflow-x: hidden; 
+    }
+    .sidebar.collapsed { width: var(--sidebar-collapsed-width); }
+    .sidebar-content { padding: 24px 16px; height: 100%; display: flex; flex-direction: column; }
+
+    /* --- LOGO DINÁMICO --- */
+    .logo { 
+      display: flex; 
+      align-items: center; 
+      justify-content: flex-start; 
+      margin-bottom: 40px; 
+      padding: 0 10px; 
+      height: 60px; 
+      width: 100%;
+    }
+    .logo-expanded { display: block; max-height: 100%; width: auto; }
+    .logo-collapsed { display: none; }
+    .sidebar.collapsed .logo-expanded { display: none; }
+    .sidebar.collapsed .logo-collapsed { display: block; width: 130px; height: 50px; margin: -50px; }
+
+    .nav-menu { flex: 1; }
+    .nav-item { display: flex; align-items: center; gap: 16px; padding: 14px 16px; margin-bottom: 8px; border-radius: 12px; color: var(--gray-400); text-decoration: none; transition: all 0.3s ease; cursor: pointer; }
+    .nav-item:hover { background: rgba(255, 255, 255, 0.1); color: var(--white); }
+    .nav-item.active { background: var(--primary-purple); color: var(--primary-yellow); }
+    .nav-item.active i { color: var(--primary-yellow); } 
+    .nav-item i { font-size: 20px; min-width: 24px; text-align: center; flex-shrink: 0; }
+    .nav-item span { font-weight: 500; transition: opacity 0.3s ease; white-space: nowrap; }
+    .sidebar.collapsed .nav-item span { opacity: 0; visibility: hidden; }
+    .sidebar-divider { border: 0; border-top: 1px solid var(--gray-700); margin: 15px 0; opacity: 0.5; }
+
+    /* --- DESKTOP TOGGLE BUTTON --- */
+    .toggle-btn { position: fixed; top: 50%; transform: translateY(-50%); left: calc(var(--sidebar-width) - 12px); width: 25px; height: 25px; background: var(--primary-purple); border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2); transition: all 0.3s ease; color: var(--primary-yellow); font-size: 8px; z-index: 10000; }
+    .toggle-btn:hover { transform: translateY(-50%) scale(1.1); }
+    .sidebar.collapsed ~ .toggle-btn { left: calc(var(--sidebar-collapsed-width) - 12px); }
+    .sidebar.collapsed ~ .toggle-btn i { transform: rotate(180deg); }
+    
+    .main-content { flex: 1; margin-left: var(--sidebar-width); padding: 32px; overflow-y: auto; transition: margin-left 0.3s ease; min-height: 100vh; }
+    .sidebar.collapsed + .main-content { margin-left: var(--sidebar-collapsed-width); }
+    
+    /* --- ESTILOS GENERALES --- */
+    .content-header { margin-bottom: 32px; }
+    .content-header h1 { font-size: 32px; font-weight: 700; color: var(--white); margin-bottom: 8px; }
+    .content-header p { color: var(--gray-600); font-size: 16px; }
+    .form-card { background: var(--primary-black); border-radius: 16px; padding: 32px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.20); border: 1px solid var(--gray-200); }
+    .status-panel { background: var(--primary-black); border-radius: 16px; padding: 32px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08); border: 1px solid var(--gray-200); }
+    .search-bar { display: flex; gap: 16px; margin-bottom: 24px; }
+    .search-input { flex: 1; padding: 12px 16px; border: 1px solid var(--gray-300); border-radius: 8px; font-size: 15px; }
+    .table-container { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; }
+    th { text-align: left; padding: 12px 16px; background: var(--gray-100); font-weight: 600; color: var(--gray-700); font-size: 14px; border-bottom: 2px solid var(--gray-200); }
+    td { padding: 16px; border-bottom: 1px solid var(--gray-200); font-size: 14px; }
+    tr:hover { background: var(--gray-50); }
+    
+    .btn { padding: 12px 24px; border: none; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; transition: all 0.3s ease; display: inline-flex; align-items: center; gap: 8px; }
+    .btn-primary { background: var(--primary-purple); color: var(--primary-yellow); }
+    .btn-primary:hover { background: #4a1e7b; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(96, 38, 158, 0.3); }
+    .btn-secondary { background: var(--primary-yellow); color: var(--primary-purple); }
+    .btn-secondary:hover { background: var(--gray-300); }
+    
+    .toast { position: fixed; top: 20px; right: 20px; background: var(--primary-black); padding: 16px 20px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); display: flex; align-items: center; gap: 12px; z-index: 9999; animation: slideIn 0.3s ease; }
+    .toast.success { border-left: 4px solid #22c55e; }
+    .toast.error { border-left: 4px solid #ef4444; }
+    .toast i { font-size: 20px; }
+    .toast.success i { color: #22c55e; }
+    .toast.error i { color: #ef4444; }
+    @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    
+    /* --- ESTILOS PARA BOTONES CIRCULARES DE ALIADOS --- */
+    .aliados-selector { display: flex; gap: 30px; justify-content: center; margin-top: 20px; }
+    .aliado-card { width: 100px; height: 100px; border-radius: 50%; border: 2px solid var(--gray-300); cursor: pointer; transition: all 0.3s ease; background: var(--primary-black); overflow: hidden; display: flex; justify-content: center; align-items: center; padding: 8px; }
+    .aliado-card img { width: 100%; height: 100%; object-fit: contain; }
+    .aliado-card:hover { border-color: var(--primary-purple); transform: scale(1.1); box-shadow: 0 4px 8px rgba(0,0,0,0.15); }
+
+    /* --- ESTILOS BIENVENIDA --- */
+    #bienvenidaPanel { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 90vh; background: linear-gradient(135deg, #fbfbfb 0%, #f0f0f0 50%, #60269e 100%); position: relative; overflow: hidden; border-radius: 30px; }
+    .welcome-unique-text { text-align: center; color: #fff; z-index: 10; margin-bottom: 60px; padding: 0 20px; }
+    .welcome-unique-text h1 { font-size: 42px; font-weight: 800; text-transform: uppercase; letter-spacing: 2px; background: linear-gradient(to right, #60269e, #4a1e7b); -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-shadow: 0 0 20px rgba(96, 38, 158, 0.3); margin-bottom: 10px; }
+    .welcome-unique-text p { font-size: 18px; color: rgb(0 0 0 / 100%); letter-spacing: 1px; }
+    .partners-arch { display: flex; justify-content: center; align-items: flex-end; width: 100%; max-width: 900px; padding-bottom: 50px; position: relative; }
+    .partner-showcase { width: 110px; height: 110px; background: rgba(255, 255, 255, 0.1); border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.2); display: flex; justify-content: center; align-items: center; margin: 0 10px; transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); position: relative; cursor: default; }
+    .partner-showcase:hover { background: #fff; transform: translateY(-20px) scale(1.15); border-color: var(--primary-purple); box-shadow: 0 10px 30px rgba(96, 38, 158, 0.4); z-index: 20; }
+    .partner-showcase img { width: 70%; height: 70%; object-fit: contain; transition: all 0.4s ease; }
+    .partner-showcase:hover img { width: 80%; height: 80%; }
+    @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+
+    /* ==========================================
+       ESTILOS NUEVOS: FORMULARIO EN LÍNEA (NOVEDAD)
+       ========================================== */
+    
+    /* Estado seleccionado del logo */
+    .aliado-card.selected {
+      border-color: var(--primary-purple);
+      background: rgba(255, 255, 255, 0.1);
+      transform: scale(1.1);
+      box-shadow: 0 4px 15px rgba(96, 38, 158, 0.4);
+    }
+
+    /* Estilos inputs del formulario */
+    .form-group {
+      margin-bottom: 15px;
+      text-align: left;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--gray-500);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .form-group input, 
+    .form-group select {
+      width: 100%;
+      padding: 12px 15px;
+      background-color: var(--gray-100);
+      border: 1px solid var(--gray-300);
+      border-radius: 8px;
+      color: var(--gray-900);
+      font-size: 14px;
+      font-family: 'Inter', sans-serif;
+      transition: border-color 0.3s;
+    }
+
+    .form-group input:focus, 
+    .form-group select:focus {
+      outline: none;
+      border-color: var(--primary-purple);
+      background-color: #fff;
+    }
+
+    /* Animación aparición formulario */
+    @keyframes slideDown {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    #contenedorFormularioNovedad {
+      animation: slideDown 0.4s ease forwards;
+    }
+
+
+/* ==========================================
+       ESTILOS LOADING (CARGANDO)
+       ========================================== */
+    
+    .loading {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.7); /* Fondo negro semitransparente */
+      z-index: 99999; /* Para que quede encima de todo */
+      display: none; /* Oculto por defecto */
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+    }
+
+    .spinner {
+      width: 50px;
+      height: 50px;
+      border: 5px solid rgba(255, 255, 255, 0.3); /* Borde gris claro */
+      border-radius: 50%;
+      border-top: 5px solid var(--primary-purple); /* Borde superior morado (tu color principal) */
+      animation: spin 1s linear infinite; /* Animación de giro */
+    }
+
+    /* Texto opcional debajo del spinner */
+    .loading p {
+      color: #fff;
+      margin-top: 15px;
+      font-weight: 500;
+      font-size: 16px;
+    }
+
+    /* Definición de la animación de giro */
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    /* ==========================================
+       RESPONSIVE MOBILE
+       ========================================== */
+    @media (max-width: 768px) {
+      .sidebar { transform: translateX(-100%); width: 280px !important; }
+      .sidebar.active { transform: translateX(0); }
+      .main-content { margin-left: 0 !important; padding: 20px; padding-top: 70px; }
+      .toggle-btn { display: none !important; }
+      .mobile-nav-bar { display: flex; position: fixed; top: 0; left: 0; width: 100%; height: 60px; background: var(--primary-black); align-items: center; justify-content: space-between; padding: 0 20px; z-index: 999; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+      .hamburger-btn { font-size: 28px; color: var(--primary-purple); cursor: pointer; display: flex; align-items: center; background: none; border: none; padding: 0; }
+      .mobile-brand { color: var(--white); font-weight: 700; font-size: 20px; }
+      .sidebar-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 990; opacity: 0; visibility: hidden; transition: all 0.3s ease; }
+      .sidebar-overlay.active { opacity: 1; visibility: visible; }
+
+      .aliados-selector { gap: 15px; flex-wrap: wrap; justify-content: center; }
+      .aliado-card { width: 75px; height: 75px; }
+
+      .partners-arch { flex-wrap: wrap; padding-bottom: 20px; justify-content: center; }
+      .partner-showcase { width: 60px; height: 60px; margin: 5px; }
+      .welcome-unique-text h1 { font-size: 28px; }
+      .welcome-unique-text p { font-size: 14px; }
+      .welcome-unique-text { margin-bottom: 30px; }
+    }
+
+    @media (min-width: 769px) {
+      .mobile-nav-bar { display: none; }
+      .sidebar-overlay { display: none; }
+    }
+
+    /* --- Estilos Textarea y File Input --- */
+    .form-group textarea {
+      width: 100%;
+      padding: 12px 15px;
+      background-color: var(--gray-100);
+      border: 1px solid var(--gray-300);
+      border-radius: 8px;
+      color: var(--gray-900);
+      font-size: 14px;
+      font-family: 'Inter', sans-serif;
+      resize: vertical;
+      transition: border-color 0.3s;
+    }
+
+    .form-group textarea:focus {
+      outline: none;
+      border-color: var(--primary-purple);
+      background-color: #fff;
+    }
+
+    /* --- Estilos Iconos de Soporte --- */
+    .soporte-icons {
+      display: flex;
+      gap: 8px;
+    }
+
+    /* --- Icono de Soporte (Imagen) --- */
+    .btn-ver-soporte {
+      color: var(--primary-purple); /* Morado por defecto */
+      font-size: 18px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .btn-ver-soporte:hover {
+      transform: scale(1.2);
+      color: var(--primary-yellow);
+    }
+
+    /* Estado VISTO (Naranja) */
+    .btn-ver-soporte.visto {
+      color: var(--primary-yellow); /* Tu color naranja definido */
+      pointer-events: none;
+    }
+
+    .btn-ver-soporte.visto i::before {
+      content: "\f26b"; /* Cambia el icono a Check cuando se ve */
+    }
+
+
+    /* --- ESTILOS DEL MODAL --- */
+    .modal-overlay {
+      display: none; /* Oculto por defecto */
+      position: fixed;
+      z-index: 100000; /* Por encima de todo */
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0,0,0,0.6); /* Fondo oscuro */
+      align-items: center;
+      justify-content: center;
+      animation: fadeIn 0.3s ease;
+    }
+
+    .modal-content {
+      background-color: var(--primary-black);
+      color: var(--gray-900);
+      width: 90%;
+      max-width: 500px;
+      border-radius: 16px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+      overflow: hidden;
+      border: 1px solid var(--gray-300);
+    }
+
+    .modal-header {
+      background: var(--primary-purple);
+      color: #fff;
+      padding: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .modal-header h3 { margin: 0; font-size: 18px; font-weight: 600; }
+    .close-modal { font-size: 28px; font-weight: bold; cursor: pointer; color: #fff; }
+    .close-modal:hover { opacity: 0.7; }
+
+    .modal-body { padding: 24px; }
+
+    .modal-section { margin-bottom: 20px; }
+    .modal-section label { display: block; font-size: 12px; color: var(--gray-500); text-transform: uppercase; font-weight: 700; margin-bottom: 8px; }
+
+    .info-box {
+      background: var(--gray-100);
+      padding: 12px;
+      border-radius: 8px;
+      border-left: 4px solid var(--gray-600);
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-height: 40px;
+    }
+
+    .solution-box {
+      border-left-color: var(--primary-yellow); /* Borde amarillo para la solución */
+      font-weight: 500;
+      color: var(--gray-900);
+    }
+
+    .modal-footer {
+      padding: 15px 24px;
+      background: var(--gray-100);
+      text-align: right;
+      border-top: 1px solid var(--gray-300);
+    }
+
+    /* --- BADGES DE ESTADO (Solucionado / Pendiente) --- */
+    .badge-estado {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+    }
+
+    .badge-pendiente {
+      background-color: rgba(255, 103, 29, 0.1); /* Naranja claro */
+      color: var(--primary-yellow); /* Naranja texto */
+      border: 1px solid rgba(255, 103, 29, 0.2);
+    }
+
+    .badge-solucionado {
+      background-color: rgba(34, 197, 94, 0.1); /* Verde claro */
+      color: #22c55e; /* Verde texto */
+      border: 1px solid rgba(34, 197, 94, 0.2);
+    }
+
+    .btn-gestion {
+      cursor: pointer;
+      color: var(--gray-600);
+      font-size: 16px;
+      transition: color 0.2s;
+      margin-left: 8px;
+    }
+    .btn-gestion:hover { color: var(--primary-purple); }
+
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+  </style>
+</head>
+<body>
+  <div class="app-container">
+    
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-content">
+        <!-- Logo -->
+        <div class="logo">
+          <img src="https://i.imgur.com/b9NCP9G.png" alt="Loggy24" class="logo-expanded">
+          <img src="https://i.imgur.com/WubPUN2.png" alt="Loggy24" class="logo-collapsed">
+        </div>
+        
+        <nav class="nav-menu">
+          <a href="#" class="nav-item" data-panel="novedad">
+            <i class="bi bi-exclamation-triangle"></i>
+            <span>Gestión Novedad</span>
+          </a>
+          <hr class="sidebar-divider">
+          <a href="#" class="nav-item" data-panel="status">
+            <i class="bi bi-clock-history"></i>
+            <span>Estado Novedad</span>
+          </a>
+        </nav>
+      </div>
+    </aside>
+
+    <div class="toggle-btn" id="toggleSidebar">
+      <i class="bi bi-chevron-left"></i>
+    </div>
+
+    <main class="main-content">
+      
+      <div class="mobile-nav-bar">
+        <button class="hamburger-btn" id="hamburgerMenu">
+          <i class="bi bi-list"></i>
+        </button>
+        <div class="mobile-brand">LOGGY24</div>
+      </div>
+
+      <!-- PANEL BIENVENIDA -->
+      <div id="bienvenidaPanel">
+        <div class="welcome-unique-text">
+          <h1>Bienvenido a Loggy24</h1>
+          <p>Gestión Integral de Novedades</p>
+        </div>
+
+        <div class="partners-arch">
+          <div class="partner-showcase" style="animation: float 4s ease-in-out infinite;">
+            <img src="https://i.postimg.cc/tCk1Jf6X/images-(1).png" alt="Servientrega">
+          </div>
+          <div class="partner-showcase" style="animation: float 4.5s ease-in-out infinite;">
+            <img src="https://i.postimg.cc/2jqJ616Y/Interrapidisimo.png" alt="Inter Rapidísimo">
+          </div>
+          <div class="partner-showcase" style="animation: float 5s ease-in-out infinite;">
+            <img src="https://i.postimg.cc/1XJ42vNB/Logo-TCC-svg.png" alt="TCC">
+          </div>
+          <div class="partner-showcase" style="animation: float 5.5s ease-in-out infinite;">
+            <img src="https://i.postimg.cc/66LZC0Tf/logo-coordinadora-efficommerce-1-Photoroom.png" alt="Coordinadora">
+          </div>
+        </div>
+      </div>
+
+      <!-- PANEL GESTIÓN NOVEDAD -->
+      <div id="novedadPanel" class="panel" style="display: none;">
+        
+        <!-- Tarjeta de Selección de Aliado -->
+        <div class="form-card" style="margin-bottom: 32px; padding: 2px 32px;">
+          <div class="content-header">
+            <h1>Gestión Novedad</h1>
+            <p>Selecciona la transportadora para gestionar la novedad</p>
+          </div>
+        </div>
+
+        <div class="form-card" style="text-align: center; padding-bottom: 20px;">
+            <div class="aliados-selector">
+                <div class="aliado-card" data-aliado="Servientrega">
+                  <img src="https://i.postimg.cc/gJLwwVQJ/images.jpg" alt="Servientrega">
+                </div>
+                <div class="aliado-card" data-aliado="Inter Rapidísimo">
+                  <img src="https://i.postimg.cc/2jqJ616Y/Interrapidisimo.png" alt="Inter Rapidísimo">
+                </div>
+                <div class="aliado-card" data-aliado="TCC">
+                  <img src="https://i.postimg.cc/1XJ42vNB/Logo-TCC-svg.png" alt="TCC">
+                </div>
+                <div class="aliado-card" data-aliado="Coordinadora">
+                  <img src="https://i.postimg.cc/66LZC0Tf/logo-coordinadora-efficommerce-1-Photoroom.png" alt="Coordinadora">
+                </div>
+            </div>
+        </div>
+
+        <!-- AQUÍ APARECERÁ EL FORMULARIO (INICIALMENTE OCULTO) -->
+        <div id="contenedorFormularioNovedad" class="form-card" style="display: none; margin-top: 20px; border-left: 5px solid var(--primary-purple);">
+            <div class="content-header" style="margin-bottom: 20px; border-bottom: 1px solid var(--gray-200); padding-bottom: 10px;">
+                <h3 id="tituloFormulario" style="color: var(--primary-purple); font-size: 20px;">Registrando novedad para: ...</h3>
+            </div>
+
+
+            <form id="formNovedad">
+                <!-- Input oculto para identificar el aliado en el backend -->
+                <input type="hidden" id="hiddenAliado" name="aliado" value="">
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div class="form-group">
+                        <label for="novedadCorreo">Correo Electrónico</label>
+                        <input type="email" id="novedadCorreo" name="correo" placeholder="cliente@email.com" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="novedadGuia">Número de Guía</label>
+                        <input type="text" id="novedadGuia" name="guia" placeholder="Ingresa la guía" required>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="novedadSolicitud">Tipo de Solicitud</label>
+                    <select id="novedadSolicitud" name="solicitud" required>
+                        <!-- Las opciones se llenan dinámicamente con JS -->
+                    </select>
+                </div>
+
+                <div id="camposExtraTransportadora" style="display: none;">
+                    
+                    <div id="campoReclamaciones" class="form-group" style="display: none;">
+                        <label for="novedadReclamacion" style="color: var(--primary-yellow);">Reclamaciones</label>
+                        <select id="novedadReclamacion" name="reclamacion">
+                            <!-- Las opciones se llenan dinámicamente con JS -->
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="novedadObservaciones">Información - Observaciones</label>
+                        <textarea id="novedadObservaciones" name="observaciones" rows="3" placeholder="Describe los detalles..."></textarea>
+                    </div>
+
+                    <!-- NUEVO SISTEMA DE CARGA DE ARCHIVOS -->
+                    <div class="form-group">
+                        <label>Soportes</label>
+                        
+                        <!-- Input nativo oculto -->
+                        <input type="file" id="novedadSoportes" name="soportes" multiple accept=".pdf,.jpg,.png,.jpeg" style="display: none;">
+                        
+                        <!-- Botón personalizado -->
+                        <button type="button" id="btnSeleccionarArchivos" class="btn btn-secondary" style="width: 100%; justify-content: center; border-style: dashed; border-width: 2px; background: rgba(255,255,255,0.05);">
+                            <i class="bi bi-cloud-arrow-up"></i> Clic aquí para seleccionar uno o varios archivos
+                        </button>
+                        
+                        <!-- Previsualización de archivos -->
+                        <small id="listaArchivos" style="color: var(--primary-purple); font-weight: 600; display: block; margin-top: 10px; min-height: 20px;"></small>
+                    </div>
+                </div>
+
+                <div style="text-align: right; margin-top: 20px;">
+                    <button type="button" class="btn btn-secondary" id="btnCancelarForm">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Registrar Novedad</button>
+                </div>
+            </form>
+        </div>
+
+      </div>
+
+      <!-- PANEL ESTADO NOVEDAD -->
+      <div id="statusPanel" class="panel" style="display: none;">
+        <div class="form-card" style="margin-bottom: 32px; padding: 2px 32px;">
+          <div class="content-header">
+            <h1>Estado Novedad</h1>
+            <p>Consulta el estado de tus novedades registradas</p>
+          </div>
+        </div>  
+        <div class="status-panel">
+          <div class="search-bar">
+            <select class="form-control form-select" id="searchType" style="max-width: 200px;">
+              <option value="guia">Número de Guía</option>
+              <option value="correo">Correo Electrónico</option>
+            </select>
+            <input type="text" class="search-input" id="searchValue" placeholder="Ingresa la guía o correo">
+            <button class="btn btn-primary" id="btnBuscar"><i class="bi bi-search"></i> Buscar</button>
+            <button class="btn btn-secondary" id="btnLimpiar"><i class="bi bi-x-circle"></i> Limpiar</button>
+          </div>
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th><i class="bi bi-calendar3"></i> Fecha</th>
+                  <th><i class="bi bi-truck"></i> Aliado</th>
+                  <th><i class="bi bi-upc-scan"></i> Guía</th>
+                  <th><i class="bi bi-info-circle"></i> Solicitud</th>
+                  <th><i class="bi bi-card-text"></i> Observaciones</th>
+                  <th><i class="bi bi-file-earmark"></i> Soportes</th>
+                  <th><i class="bi bi-file-earmark"></i>Gestión Novedad</th>
+                </tr>
+              </thead>
+              <tbody id="tablaResultados"></tbody>
+            </table>
+            <div id="sinResultados" style="display: none; text-align: center; padding: 40px; color: var(--gray-500);">
+              <i class="bi bi-inbox" style="font-size: 48px; margin-bottom: 16px;"></i>
+              <p>No se encontraron novedades con esos datos</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+  
+  <div class="loading" id="loading">
+    <div class="spinner"></div>
+    <p>Procesando solicitud...</p>
+  </div>
+  
+
+  <!-- MODAL DE GESTIÓN DE NOVEDAD -->
+  <div id="modalGestion" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3><i class="bi bi-clipboard-check"></i> Gestión de Novedad</h3>
+        <span class="close-modal" id="cerrarModal">&times;</span>
+      </div>
+      <div class="modal-body">
+        
+        <div class="modal-section">
+          <label>Área Encargada</label>
+          <div class="info-box">
+            <i class="bi bi-building"></i> 
+            <span id="modalArea">Logística / Calidad</span>
+          </div>
+        </div>
+
+        <div class="modal-section">
+          <label>Solución Reportada</label>
+          <div class="info-box solution-box" id="modalSolucion">
+            <!-- Aquí va el texto de la solución -->
+          </div>
+        </div>
+
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" onclick="cerrarModalFunc()">Entendido</button>
+      </div>
+    </div>
+  </div>
+
+
+  <script>
+  // =================================================================
+  // CONFIGURACIÓN API
+  // =================================================================
+  const API_BASE_URL = 'https://script.google.com/macros/s/AKfycby_IZPD3-kH1BF8TKtb9OqGerlRYUIVIK2rWJ5qPMJromOwpL_yhFAngyW11tUBe0UF/exec';
+
+  // Función genérica para llamar a la API
+  function callAppsScript(functionName, params = {}) {
+    const url = `${API_BASE_URL}?function=${functionName}&params=${encodeURIComponent(JSON.stringify(params))}`;
+    
+    return fetch(url)
+      .then(response => response.json())
+      .catch(error => {
+        console.error('Error calling Apps Script:', error);
+        showToast('Error de conexión con el servidor', 'error');
+        return { success: false, message: 'Error de conexión' };
+      });
+  }
+
+  document.addEventListener('DOMContentLoaded', function() {
+    const sidebarToggle = document.getElementById('toggleSidebar');
+    const hamburgerMenu = document.getElementById('hamburgerMenu');
+    const sidebarOverlay = document.getElementById('sidebarOverlay');
+    const sidebar = document.getElementById('sidebar');
+    const mainContent = document.querySelector('.main-content');
+    
+    // --- CERRAR SIDEBAR MÓVIL ---
+    function closeMobileSidebar() {
+      sidebar.classList.remove('active');
+      sidebarOverlay.classList.remove('active');
+    }
+
+    // --- TOGGLE SIDEBAR ESCRITORIO ---
+    sidebarToggle.addEventListener('click', function() {
+      if(window.innerWidth > 768) {
+        sidebar.classList.toggle('collapsed');
+        if (sidebar.classList.contains('collapsed')) {
+          mainContent.style.marginLeft = 'var(--sidebar-collapsed-width)';
+        } else {
+          mainContent.style.marginLeft = 'var(--sidebar-width)';
+        }
+      }
+    });
+
+    // --- TOGGLE SIDEBAR MÓVIL ---
+    hamburgerMenu.addEventListener('click', function() {
+      sidebar.classList.toggle('active');
+      sidebarOverlay.classList.toggle('active');
+    });
+
+    // --- CERRAR OVERLAY ---
+    sidebarOverlay.addEventListener('click', function() {
+      closeMobileSidebar();
+    });
+
+    // --- LÓGICA DE NAVEGACIÓN ---
+    const menuLinks = document.querySelectorAll('.nav-item');
+    const novedadPanel = document.getElementById('novedadPanel');
+    const statusPanel = document.getElementById('statusPanel');
+    const bienvenidaPanel = document.getElementById('bienvenidaPanel');
+
+    // Ocultar paneles al inicio
+    novedadPanel.style.display = 'none';
+    statusPanel.style.display = 'none';
+    bienvenidaPanel.style.display = 'flex'; 
+    
+    menuLinks.forEach(link => link.classList.remove('active'));
+
+    menuLinks.forEach(link => {
+      link.addEventListener('click', function(e) {
+        e.preventDefault();
+        if (window.innerWidth <= 768) {
+          closeMobileSidebar();
+        }
+        menuLinks.forEach(l => l.classList.remove('active'));
+        this.classList.add('active');
+        bienvenidaPanel.style.display = 'none';
+
+        const targetPanel = this.getAttribute('data-panel');
+        
+        novedadPanel.style.display = 'none';
+        statusPanel.style.display = 'none';
+
+        if (targetPanel === 'novedad') {
+          novedadPanel.style.display = 'block';
+        } 
+        else if (targetPanel === 'status') {
+          statusPanel.style.display = 'block';
+          document.getElementById('tablaResultados').innerHTML = '';
+          document.getElementById('sinResultados').style.display = 'none';
+        }
+      });
+    });
+
+    // --- LÓGICA DEL FORMULARIO EN LÍNEA (NOVEDAD) ---
+    const aliadoCards = document.querySelectorAll('.aliado-card');
+    const contenedorFormulario = document.getElementById('contenedorFormularioNovedad');
+    const tituloFormulario = document.getElementById('tituloFormulario');
+    const btnCancelarForm = document.getElementById('btnCancelarForm');
+    const formNovedad = document.getElementById('formNovedad');
+
+    let aliadoSeleccionado = '';
+
+    // --- CONFIGURACIÓN DE DATOS POR TRANSPORTADORA ---
+    const configTransportadoras = {
+      "Inter Rapidísimo": {
+        solicitudes: [
+          "GUIAS INEXISTENTES",
+          "CAMBIO DE DIIRECCION",
+          "NUEVO OFRECIMIENTO - REHUSADO",
+          "TIPO DE ENTREGA",
+          "INVESTIGACION Y RECLAMACIONES",
+          "CIERRES LOGISTICOS ENTREGA EXITOSA",
+          "DEVOLUCION A PETICION DEL REMITENTE",
+          "ESTADO REAL INFORMACION DE ENVIO",
+          "DIRECCION DE OFICINA"
+        ],
+        reclamaciones: [
+          "DEVOLUCION MAL MOTIVADA",
+          "HURTOS EN SISTEMA - SINIESTRO",
+          "POSIBLE SAQUEO",
+          "SNC POR TIEMPOS",
+          "MAL MOTIVADA POR DIRECCION"
+        ]
+      },
+      "Servientrega": {
+        solicitudes: [
+          "GUIAS INEXISTENTES",
+          "MODIFICACION DE DIRECCION",
+          "NUEVO OFRECIMIENTO - REHUSADO",
+          "TIPO DE ENTREGA CAMBIADO SIN AUTORIZACION",
+          "INVESTIGACION Y RECLAMACIONES",
+          "CIERRES LOGISTICOS ENTREGA EXITOSA",
+          "DEVOLUCION POR SOLICITUD DEL REMITENTE",
+          "SOLICITUD CAMBIO TIPO DE ENTREGA",
+          "DIRECCION DE OFICINA"
+        ],
+        reclamaciones: [
+          "AVERIA",
+          "PERDIDA",
+          "INCUMPLIMIENTO EN TIEMPOS DE ENTREGA",
+          "NO CONFORMIDAD",
+          "EXPOLIACION (Saqueo)"
+        ]
+      },
+      "Coordinadora": {
+        solicitudes: [
+          "GUIAS INEXISTENTES",
+          "CAMBIO DE DIIRECCION",
+          "NUEVO OFRECIMIENTO - REHUSADO",
+          "SOLICITUD CAMBIO TIPO DE ENTREGA",
+          "INVESTIGACION Y RECLAMACIONES",
+          "CIERRES LOGISTICOS ENTREGA EXITOSA",
+          "DEVOLUCION A PETICION DEL REMITENTE",
+          "ESTADO REAL INFORMACION DE ENVIO",
+          "DIRECCION DE OFICINA",
+          "ANULACION DE GUIA"
+        ],
+        reclamaciones: [
+          "DETERIORO",
+          "DEVOLUCION MAL MOTIVADA",
+          "HURTOS EN SISTEMA - SINIESTRO",
+          "POSIBLE SAQUEO",
+          "SNC POR TIEMPOS",
+          "MAL MOTIVADA POR DIRECCION"
+        ]
+      },
+      "TCC": {
+        // MISMA CONFIGURACIÓN QUE SERVIENTREGA
+        solicitudes: [
+          "GUIAS INEXISTENTES",
+          "MODIFICACION DE DIRECCION",
+          "NUEVO OFRECIMIENTO - REHUSADO",
+          "TIPO DE ENTREGA CAMBIADO SIN AUTORIZACION",
+          "INVESTIGACION Y RECLAMACIONES",
+          "CIERRES LOGISTICOS ENTREGA EXITOSA",
+          "DEVOLUCION POR SOLICITUD DEL REMITENTE",
+          "SOLICITUD CAMBIO TIPO DE ENTREGA",
+          "DIRECCION DE OFICINA"
+        ],
+        reclamaciones: [
+          "AVERIA",
+          "PERDIDA",
+          "INCUMPLIMIENTO EN TIEMPOS DE ENTREGA",
+          "NO CONFORMIDAD",
+          "EXPOLIACION (Saqueo)"
+        ]
+      }
+    };
+
+    const solicitudSelect = document.getElementById('novedadSolicitud');
+    const reclamacionSelect = document.getElementById('novedadReclamacion');
+    const campoReclamaciones = document.getElementById('campoReclamaciones');
+    const camposExtra = document.getElementById('camposExtraTransportadora');
+
+    // Función para llenar un select
+    function llenarSelect(selectElement, opciones) {
+      selectElement.innerHTML = '<option value="" disabled selected>Selecciona una opción...</option>';
+      opciones.forEach(opcion => {
+        const option = document.createElement('option');
+        option.value = opcion;
+        option.textContent = opcion;
+        selectElement.appendChild(option);
+      });
+    }
+
+    // --- Click en Logo ---
+    aliadoCards.forEach(card => {
+      card.addEventListener('click', function() {
+        const nombreAliado = this.getAttribute('data-aliado');
+        aliadoSeleccionado = nombreAliado;
+
+        // Guardar en el input oculto
+        document.getElementById('hiddenAliado').value = nombreAliado;
+
+        // 1. Estilos visuales
+        aliadoCards.forEach(c => c.classList.remove('selected'));
+        this.classList.add('selected');
+
+        // 2. Resetear formulario
+        formNovedad.reset();
+        campoReclamaciones.style.display = 'none';
+        document.getElementById('listaArchivos').innerHTML = ''; // Limpiar lista de archivos
+        document.getElementById('btnSeleccionarArchivos').innerHTML = '<i class="bi bi-cloud-arrow-up"></i> Clic aquí para seleccionar uno o varios archivos';
+
+        // 3. Cargar configuración específica
+        const config = configTransportadoras[nombreAliado];
+
+        if (config) {
+          llenarSelect(solicitudSelect, config.solicitudes);
+          llenarSelect(reclamacionSelect, config.reclamaciones);
+          camposExtra.style.display = 'block';
+        } else {
+          solicitudSelect.innerHTML = '<option value="" disabled selected>Configuración pendiente</option>';
+          camposExtra.style.display = 'none';
+        }
+
+        // 4. Mostrar contenedor
+        tituloFormulario.textContent = `Registrando novedad para: ${nombreAliado}`;
+        contenedorFormulario.style.display = 'block';
+        contenedorFormulario.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      });
+    });
+
+    // --- Lógica del Desplegable Condicional (Reclamaciones) ---
+    solicitudSelect.addEventListener('change', function() {
+      if (this.value === 'INVESTIGACION Y RECLAMACIONES') {
+        campoReclamaciones.style.display = 'block';
+      } else {
+        campoReclamaciones.style.display = 'none';
+        reclamacionSelect.value = "";
+      }
+    });
+
+    // --- LÓGICA DEL BOTÓN PERSONALIZADO PARA ARCHIVOS ---
+    const btnSeleccionarArchivos = document.getElementById('btnSeleccionarArchivos');
+    const inputSoportes = document.getElementById('novedadSoportes');
+    const listaArchivos = document.getElementById('listaArchivos');
+
+    btnSeleccionarArchivos.addEventListener('click', function() {
+        inputSoportes.click();
+    });
+
+    inputSoportes.addEventListener('change', function() {
+        if (this.files && this.files.length > 0) {
+            const cantidad = this.files.length;
+            const nombres = Array.from(this.files).map(f => f.name).join(", ");
+            listaArchivos.innerHTML = `<i class="bi bi-check-circle-fill"></i> ${cantidad} archivo(s) listo(s) para subir:<br><span style="font-weight:400; font-size:12px; opacity:0.8">${nombres}</span>`;
+            btnSeleccionarArchivos.innerHTML = `<i class="bi bi-check2"></i> Cambiar selección (${cantidad})`;
+        } else {
+            listaArchivos.textContent = "";
+            btnSeleccionarArchivos.innerHTML = `<i class="bi bi-cloud-arrow-up"></i> Clic aquí para seleccionar uno o varios archivos`;
+        }
+    });
+
+    // Botón Cancelar
+    btnCancelarForm.addEventListener('click', function() {
+      contenedorFormulario.style.display = 'none';
+      aliadoCards.forEach(c => c.classList.remove('selected'));
+      formNovedad.reset();
+      campoReclamaciones.style.display = 'none';
+      document.getElementById('listaArchivos').innerHTML = '';
+      document.getElementById('btnSeleccionarArchivos').innerHTML = '<i class="bi bi-cloud-arrow-up"></i> Clic aquí para seleccionar uno o varios archivos';
+    });
+
+    // Envío del Formulario
+    formNovedad.addEventListener('submit', async function(e) {
+      e.preventDefault(); 
+      mostrarLoading(true);
+
+      const formData = {
+        aliado: document.getElementById('hiddenAliado').value,
+        correo: document.getElementById('novedadCorreo').value,
+        guia: document.getElementById('novedadGuia').value,
+        solicitud: document.getElementById('novedadSolicitud').value,
+        reclamacion: document.getElementById('novedadReclamacion').value,
+        observaciones: document.getElementById('novedadObservaciones').value,
+        soportes: []
+      };
+
+      const files = document.getElementById('novedadSoportes').files;
+
+      for (let file of files) {
+        const base64 = await toBase64(file);
+        formData.soportes.push({
+          nombre: file.name,
+          tipo: file.type,
+          data: base64.split(',')[1]
+        });
+      }
+
+      // Llamada a la API usando fetch
+      callAppsScript('guardarNovedad', formData)
+        .then(response => {
+          mostrarLoading(false);
+          if(response.success) {
+            showToast('Novedad guardada correctamente', 'success');
+            
+            // --- LIMPIAR FORMULARIO Y VOLVER AL INICIO ---
+            formNovedad.reset();
+            campoReclamaciones.style.display = 'none';
+            document.getElementById('listaArchivos').innerHTML = '';
+            document.getElementById('btnSeleccionarArchivos').innerHTML = '<i class="bi bi-cloud-arrow-up"></i> Clic aquí para seleccionar uno o varios archivos';
+            document.getElementById('novedadSoportes').value = ''; 
+            aliadoCards.forEach(c => c.classList.remove('selected'));
+            contenedorFormulario.style.display = 'none';
+            // ---------------------------------------------
+
+          } else {
+            showToast(response.message || 'Error al guardar', 'error');
+          }
+        });
+    });
+    
+    // --- LÓGICA BUSCAR ESTADOS (RECOGIDAS) ---
+    const searchTypeSelect = document.getElementById('searchType');
+    const searchValueInput = document.getElementById('searchValue');
+    const searchButton = document.getElementById('btnBuscar');
+    const clearFilterButton = document.getElementById('btnLimpiar');
+    const tablaResultados = document.getElementById('tablaResultados');
+    const sinResultados = document.getElementById('sinResultados');
+
+    function renderizarTabla(data) {
+      tablaResultados.innerHTML = '';
+      sinResultados.style.display = 'none';
+      
+      if (data && Array.isArray(data) && data.length > 0) {
+        data.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+        
+        data.forEach(row => {
+          const fecha = row.fecha || 'Fecha no disponible';
+          const aliado = row.aliado || 'N/A';
+          const guia = row.guia || 'N/A';
+          const solicitud = row.solicitud || 'Pendiente';
+          const obs = row.observaciones || '-';
+          
+          // --- LÓGICA DE ICONOS DE SOPORTE ---
+          let iconsHtml = '<span style="color: #adb5bd; font-size: 12px;">Sin soportes</span>';
+          
+          if (row.soportesLinks && row.soportesLinks.length > 0) {
+            iconsHtml = '<div class="soporte-icons">';
+            row.soportesLinks.forEach(url => {
+              iconsHtml += `
+                <a href="${url}" target="_blank" class="btn-ver-soporte" onclick="cambiarEstadoVisto(this)">
+                  <i class="bi bi-image"></i>
+                </a>
+              `;
+            });
+            iconsHtml += '</div>';
+          }
+
+          // --- LÓGICA DE GESTIÓN DE NOVEDAD (Columna H) ---
+          let gestionHtml = '';
+          const solucion = row.solucion ? row.solucion.trim() : "";
+          
+          if (solucion !== "") {
+            // Está Solucionado
+            gestionHtml = `
+              <div style="text-align:center;">
+                <span class="badge-estado badge-solucionado">Solucionado</span>
+                <br>
+                <i class="bi bi-eye-fill btn-gestion" 
+                   data-solucion="${solucion.replace(/"/g, '&quot;')}" 
+                   onclick="abrirModal(this)">
+                </i>
+              </div>
+            `;
+          } else {
+            // Está Pendiente
+            gestionHtml = `
+              <div style="text-align:center;">
+                <span class="badge-estado badge-pendiente">Pendiente</span>
+                <br>
+                <i class="bi bi-eye-slash btn-gestion" style="opacity:0.5;"></i>
+              </div>
+            `;
+          }
+
+          let badgeColor = '#60269e'; 
+          let badgeText = '#fff';
+          if (solicitud.includes("INVESTIGACION")) badgeColor = '#dc3545';
+          if (solicitud.includes("CAMBIO")) badgeColor = '#0d6efd';
+          if (solicitud.includes("ENTREGA")) badgeColor = '#198754';
+
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>${fecha}</td>
+            <td><strong>${aliado}</strong></td>
+            <td>${guia}</td>
+            <td>
+              <span style="background-color: ${badgeColor}; color: ${badgeText}; padding: 6px 12px; border-radius: 20px; font-size: 13px; font-weight: 600; display: inline-block;">
+                ${solicitud}
+              </span>
+            </td>
+            <td style="max-width: 250px; white-space: pre-wrap; font-size: 13px;">${obs}</td>
+            <td>${iconsHtml}</td>
+            <td>${gestionHtml}</td> 
+          `;
+          tablaResultados.appendChild(tr);
+        });
+      } else {
+        sinResultados.style.display = 'block';
+      }
+    }
+
+    function cargarEstadoRecogidas() {
+      const searchType = document.getElementById('searchType').value; // 'guia' o 'correo'
+      const searchValue = document.getElementById('searchValue').value.trim();
+      
+      if (!searchValue) {
+        showToast('Por favor, ingresa un valor para buscar.', 'error');
+        return;
+      }
+      
+      console.log(`Buscando novedades por: ${searchType}, valor: ${searchValue}`);
+      mostrarLoading(true);
+      
+      // Llamada a la API usando fetch
+      callAppsScript('obtenerEstadoNovedad', { tipo: searchType, valor: searchValue })
+        .then(data => {
+          renderizarTabla(data);
+          mostrarLoading(false);
+        });
+    }
+
+    searchButton.addEventListener('click', cargarEstadoRecogidas);
+    searchValueInput.addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        cargarEstadoRecogidas();
+      }
+    });
+    clearFilterButton.addEventListener('click', function() {
+      searchValueInput.value = '';
+      document.getElementById('tablaResultados').innerHTML = '';
+      document.getElementById('sinResultados').style.display = 'none';
+    });
+
+    // --- UTILIDADES ---
+    function mostrarLoading(show) {
+        document.getElementById('loading').style.display = show ? 'flex' : 'none';
+    }
+
+    function showToast(message, type = 'success') {
+        const existingToast = document.querySelector('.toast');
+        if (existingToast) {
+          existingToast.remove();
+        }
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+        const icon = type === 'success' 
+          ? '<i class="bi bi-check-circle-fill"></i>' 
+          : '<i class="bi bi-exclamation-circle-fill"></i>';
+        toast.innerHTML = `${icon}<div>${message}</div>`;
+        document.body.appendChild(toast);
+        setTimeout(() => {
+            toast.style.animation = 'slideIn 0.3s ease reverse';
+            setTimeout(() => toast.remove(), 300);
+        }, 4000);
+    }
+
+
+    function toBase64(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = error => reject(error);
+      });
+    }
+
+    // Cerrar al clic en la X
+    document.getElementById('cerrarModal').addEventListener('click', cerrarModalFunc);
+
+  }); // <--- FIN DE document.addEventListener
+
+
+  // =======================================================
+  // FUNCIONES GLOBALES (FUERA DEL EVENT LISTENER)
+  // Necesario para que funcionen los onclick en el HTML dinámico
+  // =======================================================
+
+  function cambiarEstadoVisto(elemento) {
+    elemento.classList.add('visto');
+  }
+
+  function abrirModal(elemento) {
+    var solucionTexto = elemento.getAttribute('data-solucion');
+    var solucionFormateada = solucionTexto.replace(/\n/g, '<br>');
+    
+    document.getElementById('modalSolucion').innerHTML = solucionFormateada;
+    document.getElementById('modalGestion').style.display = 'flex';
+  }
+
+  function cerrarModalFunc() {
+    document.getElementById('modalGestion').style.display = 'none';
+  }
+
+  // Cerrar si clic fuera del modal
+  window.onclick = function(event) {
+    var modal = document.getElementById('modalGestion');
+    if (event.target == modal) {
+      modal.style.display = "none";
+    }
+  }
+
+  </script>
+</body>
+</html>
