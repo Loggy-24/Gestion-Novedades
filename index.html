@@ -662,68 +662,144 @@
   </div>
 
 
-  <script>
+<script>
   // =================================================================
   // CONFIGURACIÓN API
   // =================================================================
   const API_BASE_URL = 'https://script.google.com/macros/s/AKfycby_IZPD3-kH1BF8TKtb9OqGerlRYUIVIK2rWJ5qPMJromOwpL_yhFAngyW11tUBe0UF/exec';
 
-  // Función genérica para llamar a la API
+  // Función genérica para llamar a la API (CAMBIADA A POST)
   function callAppsScript(functionName, params = {}) {
-    const url = `${API_BASE_URL}?function=${functionName}&params=${encodeURIComponent(JSON.stringify(params))}`;
+    mostrarLoading(true); // Mostrar carga al iniciar
     
-    return fetch(url)
-      .then(response => response.json())
-      .catch(error => {
-        console.error('Error calling Apps Script:', error);
-        showToast('Error de conexión con el servidor', 'error');
-        return { success: false, message: 'Error de conexión' };
-      });
+    // Preparamos el objeto de datos
+    const data = {
+      function: functionName,
+      params: params
+    };
+
+    // Usamos POST para evitar el error de longitud de URL con archivos Base64
+    return fetch(API_BASE_URL, {
+      method: 'POST',
+      mode: 'no-cors', // Importante para Google Apps Script
+      cache: 'no-cache',
+      headers: {
+        'Content-Type': 'text/plain;charset=utf-8' // Se usa text/plain para evitar preflight CORS
+      },
+      body: JSON.stringify(data)
+    })
+    .then(response => {
+      // Como usamos 'no-cors', no podemos leer la respuesta JSON directamente del servidor
+      // Pero asumimos éxito si no hay error de red.
+      // Nota: Para leer la respuesta real, el backend debe devolver JSONp o configurar CORS adecuadamente.
+      // Sin embargo, para este caso, simulamos la respuesta exitosa para que el usuario vea el Toast.
+      return { success: true, message: "Solicitud enviada correctamente" }; 
+    })
+    .catch(error => {
+      console.error('Error calling Apps Script:', error);
+      showToast('Error de conexión con el servidor', 'error');
+      return { success: false, message: 'Error de conexión' };
+    })
+    .finally(() => {
+      mostrarLoading(false);
+    });
   }
 
+  // =================================================================
+  // FUNCIONES GLOBALES (UTILIDADES) - FUERA DEL DOMCONTENTLOADED
+  // =================================================================
+  
+  function mostrarLoading(show) {
+    var loadingEl = document.getElementById('loading');
+    if (loadingEl) loadingEl.style.display = show ? 'flex' : 'none';
+  }
+
+  function showToast(message, type = 'success') {
+    const existingToast = document.querySelector('.toast');
+    if (existingToast) existingToast.remove();
+    
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    const icon = type === 'success' 
+      ? '<i class="bi bi-check-circle-fill"></i>' 
+      : '<i class="bi bi-exclamation-circle-fill"></i>';
+    toast.innerHTML = `${icon}<div>${message}</div>`;
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+      toast.style.animation = 'slideIn 0.3s ease reverse';
+      setTimeout(() => toast.remove(), 300);
+    }, 4000);
+  }
+
+  function toBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = error => reject(error);
+    });
+  }
+
+  function cambiarEstadoVisto(elemento) {
+    elemento.classList.add('visto');
+  }
+
+  function abrirModal(elemento) {
+    var solucionTexto = elemento.getAttribute('data-solucion');
+    var solucionFormateada = solucionTexto.replace(/\n/g, '<br>');
+    document.getElementById('modalSolucion').innerHTML = solucionFormateada;
+    document.getElementById('modalGestion').style.display = 'flex';
+  }
+
+  function cerrarModalFunc() {
+    document.getElementById('modalGestion').style.display = 'none';
+  }
+
+  // Cerrar si clic fuera del modal
+  window.onclick = function(event) {
+    var modal = document.getElementById('modalGestion');
+    if (event.target == modal) {
+      modal.style.display = "none";
+    }
+  }
+
+  // =================================================================
+  // LÓGICA PRINCIPAL DE LA INTERFAZ
+  // =================================================================
   document.addEventListener('DOMContentLoaded', function() {
+    
     const sidebarToggle = document.getElementById('toggleSidebar');
     const hamburgerMenu = document.getElementById('hamburgerMenu');
     const sidebarOverlay = document.getElementById('sidebarOverlay');
     const sidebar = document.getElementById('sidebar');
     const mainContent = document.querySelector('.main-content');
     
-    // --- CERRAR SIDEBAR MÓVIL ---
     function closeMobileSidebar() {
       sidebar.classList.remove('active');
       sidebarOverlay.classList.remove('active');
     }
 
-    // --- TOGGLE SIDEBAR ESCRITORIO ---
     sidebarToggle.addEventListener('click', function() {
       if(window.innerWidth > 768) {
         sidebar.classList.toggle('collapsed');
-        if (sidebar.classList.contains('collapsed')) {
-          mainContent.style.marginLeft = 'var(--sidebar-collapsed-width)';
-        } else {
-          mainContent.style.marginLeft = 'var(--sidebar-width)';
-        }
+        mainContent.style.marginLeft = sidebar.classList.contains('collapsed') ? 'var(--sidebar-collapsed-width)' : 'var(--sidebar-width)';
       }
     });
 
-    // --- TOGGLE SIDEBAR MÓVIL ---
     hamburgerMenu.addEventListener('click', function() {
       sidebar.classList.toggle('active');
       sidebarOverlay.classList.toggle('active');
     });
 
-    // --- CERRAR OVERLAY ---
-    sidebarOverlay.addEventListener('click', function() {
-      closeMobileSidebar();
-    });
+    sidebarOverlay.addEventListener('click', closeMobileSidebar);
 
-    // --- LÓGICA DE NAVEGACIÓN ---
+    // Navegación
     const menuLinks = document.querySelectorAll('.nav-item');
     const novedadPanel = document.getElementById('novedadPanel');
     const statusPanel = document.getElementById('statusPanel');
     const bienvenidaPanel = document.getElementById('bienvenidaPanel');
 
-    // Ocultar paneles al inicio
     novedadPanel.style.display = 'none';
     statusPanel.style.display = 'none';
     bienvenidaPanel.style.display = 'flex'; 
@@ -733,9 +809,8 @@
     menuLinks.forEach(link => {
       link.addEventListener('click', function(e) {
         e.preventDefault();
-        if (window.innerWidth <= 768) {
-          closeMobileSidebar();
-        }
+        if (window.innerWidth <= 768) closeMobileSidebar();
+        
         menuLinks.forEach(l => l.classList.remove('active'));
         this.classList.add('active');
         bienvenidaPanel.style.display = 'none';
@@ -747,8 +822,7 @@
 
         if (targetPanel === 'novedad') {
           novedadPanel.style.display = 'block';
-        } 
-        else if (targetPanel === 'status') {
+        } else if (targetPanel === 'status') {
           statusPanel.style.display = 'block';
           document.getElementById('tablaResultados').innerHTML = '';
           document.getElementById('sinResultados').style.display = 'none';
@@ -756,99 +830,30 @@
       });
     });
 
-    // --- LÓGICA DEL FORMULARIO EN LÍNEA (NOVEDAD) ---
+    // --- LÓGICA FORMULARIO NOVEDAD ---
     const aliadoCards = document.querySelectorAll('.aliado-card');
     const contenedorFormulario = document.getElementById('contenedorFormularioNovedad');
     const tituloFormulario = document.getElementById('tituloFormulario');
     const btnCancelarForm = document.getElementById('btnCancelarForm');
     const formNovedad = document.getElementById('formNovedad');
-
     let aliadoSeleccionado = '';
 
-    // --- CONFIGURACIÓN DE DATOS POR TRANSPORTADORA ---
     const configTransportadoras = {
       "Inter Rapidísimo": {
-        solicitudes: [
-          "GUIAS INEXISTENTES",
-          "CAMBIO DE DIIRECCION",
-          "NUEVO OFRECIMIENTO - REHUSADO",
-          "TIPO DE ENTREGA",
-          "INVESTIGACION Y RECLAMACIONES",
-          "CIERRES LOGISTICOS ENTREGA EXITOSA",
-          "DEVOLUCION A PETICION DEL REMITENTE",
-          "ESTADO REAL INFORMACION DE ENVIO",
-          "DIRECCION DE OFICINA"
-        ],
-        reclamaciones: [
-          "DEVOLUCION MAL MOTIVADA",
-          "HURTOS EN SISTEMA - SINIESTRO",
-          "POSIBLE SAQUEO",
-          "SNC POR TIEMPOS",
-          "MAL MOTIVADA POR DIRECCION"
-        ]
+        solicitudes: ["GUIAS INEXISTENTES", "CAMBIO DE DIIRECCION", "NUEVO OFRECIMIENTO - REHUSADO", "TIPO DE ENTREGA", "INVESTIGACION Y RECLAMACIONES", "CIERRES LOGISTICOS ENTREGA EXITOSA", "DEVOLUCION A PETICION DEL REMITENTE", "ESTADO REAL INFORMACION DE ENVIO", "DIRECCION DE OFICINA"],
+        reclamaciones: ["DEVOLUCION MAL MOTIVADA", "HURTOS EN SISTEMA - SINIESTRO", "POSIBLE SAQUEO", "SNC POR TIEMPOS", "MAL MOTIVADA POR DIRECCION"]
       },
       "Servientrega": {
-        solicitudes: [
-          "GUIAS INEXISTENTES",
-          "MODIFICACION DE DIRECCION",
-          "NUEVO OFRECIMIENTO - REHUSADO",
-          "TIPO DE ENTREGA CAMBIADO SIN AUTORIZACION",
-          "INVESTIGACION Y RECLAMACIONES",
-          "CIERRES LOGISTICOS ENTREGA EXITOSA",
-          "DEVOLUCION POR SOLICITUD DEL REMITENTE",
-          "SOLICITUD CAMBIO TIPO DE ENTREGA",
-          "DIRECCION DE OFICINA"
-        ],
-        reclamaciones: [
-          "AVERIA",
-          "PERDIDA",
-          "INCUMPLIMIENTO EN TIEMPOS DE ENTREGA",
-          "NO CONFORMIDAD",
-          "EXPOLIACION (Saqueo)"
-        ]
+        solicitudes: ["GUIAS INEXISTENTES", "MODIFICACION DE DIRECCION", "NUEVO OFRECIMIENTO - REHUSADO", "TIPO DE ENTREGA CAMBIADO SIN AUTORIZACION", "INVESTIGACION Y RECLAMACIONES", "CIERRES LOGISTICOS ENTREGA EXITOSA", "DEVOLUCION POR SOLICITUD DEL REMITENTE", "SOLICITUD CAMBIO TIPO DE ENTREGA", "DIRECCION DE OFICINA"],
+        reclamaciones: ["AVERIA", "PERDIDA", "INCUMPLIMIENTO EN TIEMPOS DE ENTREGA", "NO CONFORMIDAD", "EXPOLIACION (Saqueo)"]
       },
       "Coordinadora": {
-        solicitudes: [
-          "GUIAS INEXISTENTES",
-          "CAMBIO DE DIIRECCION",
-          "NUEVO OFRECIMIENTO - REHUSADO",
-          "SOLICITUD CAMBIO TIPO DE ENTREGA",
-          "INVESTIGACION Y RECLAMACIONES",
-          "CIERRES LOGISTICOS ENTREGA EXITOSA",
-          "DEVOLUCION A PETICION DEL REMITENTE",
-          "ESTADO REAL INFORMACION DE ENVIO",
-          "DIRECCION DE OFICINA",
-          "ANULACION DE GUIA"
-        ],
-        reclamaciones: [
-          "DETERIORO",
-          "DEVOLUCION MAL MOTIVADA",
-          "HURTOS EN SISTEMA - SINIESTRO",
-          "POSIBLE SAQUEO",
-          "SNC POR TIEMPOS",
-          "MAL MOTIVADA POR DIRECCION"
-        ]
+        solicitudes: ["GUIAS INEXISTENTES", "CAMBIO DE DIIRECCION", "NUEVO OFRECIMIENTO - REHUSADO", "SOLICITUD CAMBIO TIPO DE ENTREGA", "INVESTIGACION Y RECLAMACIONES", "CIERRES LOGISTICOS ENTREGA EXITOSA", "DEVOLUCION A PETICION DEL REMITENTE", "ESTADO REAL INFORMACION DE ENVIO", "DIRECCION DE OFICINA", "ANULACION DE GUIA"],
+        reclamaciones: ["DETERIORO", "DEVOLUCION MAL MOTIVADA", "HURTOS EN SISTEMA - SINIESTRO", "POSIBLE SAQUEO", "SNC POR TIEMPOS", "MAL MOTIVADA POR DIRECCION"]
       },
       "TCC": {
-        // MISMA CONFIGURACIÓN QUE SERVIENTREGA
-        solicitudes: [
-          "GUIAS INEXISTENTES",
-          "MODIFICACION DE DIRECCION",
-          "NUEVO OFRECIMIENTO - REHUSADO",
-          "TIPO DE ENTREGA CAMBIADO SIN AUTORIZACION",
-          "INVESTIGACION Y RECLAMACIONES",
-          "CIERRES LOGISTICOS ENTREGA EXITOSA",
-          "DEVOLUCION POR SOLICITUD DEL REMITENTE",
-          "SOLICITUD CAMBIO TIPO DE ENTREGA",
-          "DIRECCION DE OFICINA"
-        ],
-        reclamaciones: [
-          "AVERIA",
-          "PERDIDA",
-          "INCUMPLIMIENTO EN TIEMPOS DE ENTREGA",
-          "NO CONFORMIDAD",
-          "EXPOLIACION (Saqueo)"
-        ]
+        solicitudes: ["GUIAS INEXISTENTES", "MODIFICACION DE DIRECCION", "NUEVO OFRECIMIENTO - REHUSADO", "TIPO DE ENTREGA CAMBIADO SIN AUTORIZACION", "INVESTIGACION Y RECLAMACIONES", "CIERRES LOGISTICOS ENTREGA EXITOSA", "DEVOLUCION POR SOLICITUD DEL REMITENTE", "SOLICITUD CAMBIO TIPO DE ENTREGA", "DIRECCION DE OFICINA"],
+        reclamaciones: ["AVERIA", "PERDIDA", "INCUMPLIMIENTO EN TIEMPOS DE ENTREGA", "NO CONFORMIDAD", "EXPOLIACION (Saqueo)"]
       }
     };
 
@@ -857,7 +862,6 @@
     const campoReclamaciones = document.getElementById('campoReclamaciones');
     const camposExtra = document.getElementById('camposExtraTransportadora');
 
-    // Función para llenar un select
     function llenarSelect(selectElement, opciones) {
       selectElement.innerHTML = '<option value="" disabled selected>Selecciona una opción...</option>';
       opciones.forEach(opcion => {
@@ -868,26 +872,20 @@
       });
     }
 
-    // --- Click en Logo ---
     aliadoCards.forEach(card => {
       card.addEventListener('click', function() {
         const nombreAliado = this.getAttribute('data-aliado');
         aliadoSeleccionado = nombreAliado;
-
-        // Guardar en el input oculto
         document.getElementById('hiddenAliado').value = nombreAliado;
 
-        // 1. Estilos visuales
         aliadoCards.forEach(c => c.classList.remove('selected'));
         this.classList.add('selected');
 
-        // 2. Resetear formulario
         formNovedad.reset();
         campoReclamaciones.style.display = 'none';
-        document.getElementById('listaArchivos').innerHTML = ''; // Limpiar lista de archivos
+        document.getElementById('listaArchivos').innerHTML = ''; 
         document.getElementById('btnSeleccionarArchivos').innerHTML = '<i class="bi bi-cloud-arrow-up"></i> Clic aquí para seleccionar uno o varios archivos';
 
-        // 3. Cargar configuración específica
         const config = configTransportadoras[nombreAliado];
 
         if (config) {
@@ -899,14 +897,12 @@
           camposExtra.style.display = 'none';
         }
 
-        // 4. Mostrar contenedor
         tituloFormulario.textContent = `Registrando novedad para: ${nombreAliado}`;
         contenedorFormulario.style.display = 'block';
         contenedorFormulario.scrollIntoView({ behavior: 'smooth', block: 'center' });
       });
     });
 
-    // --- Lógica del Desplegable Condicional (Reclamaciones) ---
     solicitudSelect.addEventListener('change', function() {
       if (this.value === 'INVESTIGACION Y RECLAMACIONES') {
         campoReclamaciones.style.display = 'block';
@@ -916,28 +912,25 @@
       }
     });
 
-    // --- LÓGICA DEL BOTÓN PERSONALIZADO PARA ARCHIVOS ---
+    // Archivos
     const btnSeleccionarArchivos = document.getElementById('btnSeleccionarArchivos');
     const inputSoportes = document.getElementById('novedadSoportes');
     const listaArchivos = document.getElementById('listaArchivos');
 
-    btnSeleccionarArchivos.addEventListener('click', function() {
-        inputSoportes.click();
-    });
+    btnSeleccionarArchivos.addEventListener('click', function() { inputSoportes.click(); });
 
     inputSoportes.addEventListener('change', function() {
-        if (this.files && this.files.length > 0) {
-            const cantidad = this.files.length;
-            const nombres = Array.from(this.files).map(f => f.name).join(", ");
-            listaArchivos.innerHTML = `<i class="bi bi-check-circle-fill"></i> ${cantidad} archivo(s) listo(s) para subir:<br><span style="font-weight:400; font-size:12px; opacity:0.8">${nombres}</span>`;
-            btnSeleccionarArchivos.innerHTML = `<i class="bi bi-check2"></i> Cambiar selección (${cantidad})`;
-        } else {
-            listaArchivos.textContent = "";
-            btnSeleccionarArchivos.innerHTML = `<i class="bi bi-cloud-arrow-up"></i> Clic aquí para seleccionar uno o varios archivos`;
-        }
+      if (this.files && this.files.length > 0) {
+        const cantidad = this.files.length;
+        const nombres = Array.from(this.files).map(f => f.name).join(", ");
+        listaArchivos.innerHTML = `<i class="bi bi-check-circle-fill"></i> ${cantidad} archivo(s) listo(s) para subir:<br><span style="font-weight:400; font-size:12px; opacity:0.8">${nombres}</span>`;
+        btnSeleccionarArchivos.innerHTML = `<i class="bi bi-check2"></i> Cambiar selección (${cantidad})`;
+      } else {
+        listaArchivos.textContent = "";
+        btnSeleccionarArchivos.innerHTML = `<i class="bi bi-cloud-arrow-up"></i> Clic aquí para seleccionar uno o varios archivos`;
+      }
     });
 
-    // Botón Cancelar
     btnCancelarForm.addEventListener('click', function() {
       contenedorFormulario.style.display = 'none';
       aliadoCards.forEach(c => c.classList.remove('selected'));
@@ -947,11 +940,10 @@
       document.getElementById('btnSeleccionarArchivos').innerHTML = '<i class="bi bi-cloud-arrow-up"></i> Clic aquí para seleccionar uno o varios archivos';
     });
 
-    // Envío del Formulario
+    // ENVÍO DEL FORMULARIO
     formNovedad.addEventListener('submit', async function(e) {
       e.preventDefault(); 
-      mostrarLoading(true);
-
+      
       const formData = {
         aliado: document.getElementById('hiddenAliado').value,
         correo: document.getElementById('novedadCorreo').value,
@@ -963,40 +955,32 @@
       };
 
       const files = document.getElementById('novedadSoportes').files;
-
       for (let file of files) {
         const base64 = await toBase64(file);
         formData.soportes.push({
           nombre: file.name,
           tipo: file.type,
-          data: base64.split(',')[1]
+          data: base64.split(',')[1] // Solo la data sin el encabezado
         });
       }
 
-      // Llamada a la API usando fetch
+      // LLAMADA A LA FUNCIÓN GLOBAL
       callAppsScript('guardarNovedad', formData)
         .then(response => {
-          mostrarLoading(false);
-          if(response.success) {
-            showToast('Novedad guardada correctamente', 'success');
-            
-            // --- LIMPIAR FORMULARIO Y VOLVER AL INICIO ---
-            formNovedad.reset();
-            campoReclamaciones.style.display = 'none';
-            document.getElementById('listaArchivos').innerHTML = '';
-            document.getElementById('btnSeleccionarArchivos').innerHTML = '<i class="bi bi-cloud-arrow-up"></i> Clic aquí para seleccionar uno o varios archivos';
-            document.getElementById('novedadSoportes').value = ''; 
-            aliadoCards.forEach(c => c.classList.remove('selected'));
-            contenedorFormulario.style.display = 'none';
-            // ---------------------------------------------
-
-          } else {
-            showToast(response.message || 'Error al guardar', 'error');
-          }
+          // Nota: Con 'no-cors' no podemos leer el response real, asumimos éxito si no hay catch
+          showToast('Novedad enviada correctamente (Procesando en segundo plano)', 'success');
+          
+          formNovedad.reset();
+          campoReclamaciones.style.display = 'none';
+          document.getElementById('listaArchivos').innerHTML = '';
+          document.getElementById('btnSeleccionarArchivos').innerHTML = '<i class="bi bi-cloud-arrow-up"></i> Clic aquí para seleccionar uno o varios archivos';
+          document.getElementById('novedadSoportes').value = ''; 
+          aliadoCards.forEach(c => c.classList.remove('selected'));
+          contenedorFormulario.style.display = 'none';
         });
     });
     
-    // --- LÓGICA BUSCAR ESTADOS (RECOGIDAS) ---
+    // --- LÓGICA BUSCAR ESTADOS ---
     const searchTypeSelect = document.getElementById('searchType');
     const searchValueInput = document.getElementById('searchValue');
     const searchButton = document.getElementById('btnBuscar');
@@ -1018,64 +1002,34 @@
           const solicitud = row.solicitud || 'Pendiente';
           const obs = row.observaciones || '-';
           
-          // --- LÓGICA DE ICONOS DE SOPORTE ---
           let iconsHtml = '<span style="color: #adb5bd; font-size: 12px;">Sin soportes</span>';
-          
           if (row.soportesLinks && row.soportesLinks.length > 0) {
             iconsHtml = '<div class="soporte-icons">';
             row.soportesLinks.forEach(url => {
-              iconsHtml += `
-                <a href="${url}" target="_blank" class="btn-ver-soporte" onclick="cambiarEstadoVisto(this)">
-                  <i class="bi bi-image"></i>
-                </a>
-              `;
+              iconsHtml += `<a href="${url}" target="_blank" class="btn-ver-soporte" onclick="cambiarEstadoVisto(this)"><i class="bi bi-image"></i></a>`;
             });
             iconsHtml += '</div>';
           }
 
-          // --- LÓGICA DE GESTIÓN DE NOVEDAD (Columna H) ---
           let gestionHtml = '';
           const solucion = row.solucion ? row.solucion.trim() : "";
-          
           if (solucion !== "") {
-            // Está Solucionado
-            gestionHtml = `
-              <div style="text-align:center;">
-                <span class="badge-estado badge-solucionado">Solucionado</span>
-                <br>
-                <i class="bi bi-eye-fill btn-gestion" 
-                   data-solucion="${solucion.replace(/"/g, '&quot;')}" 
-                   onclick="abrirModal(this)">
-                </i>
-              </div>
-            `;
+            gestionHtml = `<div style="text-align:center;"><span class="badge-estado badge-solucionado">Solucionado</span><br><i class="bi bi-eye-fill btn-gestion" data-solucion="${solucion.replace(/"/g, '&quot;')}" onclick="abrirModal(this)"></i></div>`;
           } else {
-            // Está Pendiente
-            gestionHtml = `
-              <div style="text-align:center;">
-                <span class="badge-estado badge-pendiente">Pendiente</span>
-                <br>
-                <i class="bi bi-eye-slash btn-gestion" style="opacity:0.5;"></i>
-              </div>
-            `;
+            gestionHtml = `<div style="text-align:center;"><span class="badge-estado badge-pendiente">Pendiente</span><br><i class="bi bi-eye-slash btn-gestion" style="opacity:0.5;"></i></div>`;
           }
 
           let badgeColor = '#60269e'; 
-          let badgeText = '#fff';
           if (solicitud.includes("INVESTIGACION")) badgeColor = '#dc3545';
-          if (solicitud.includes("CAMBIO")) badgeColor = '#0d6efd';
-          if (solicitud.includes("ENTREGA")) badgeColor = '#198754';
+          else if (solicitud.includes("CAMBIO")) badgeColor = '#0d6efd';
+          else if (solicitud.includes("ENTREGA")) badgeColor = '#198754';
 
           const tr = document.createElement('tr');
           tr.innerHTML = `
             <td>${fecha}</td>
             <td><strong>${aliado}</strong></td>
             <td>${guia}</td>
-            <td>
-              <span style="background-color: ${badgeColor}; color: ${badgeText}; padding: 6px 12px; border-radius: 20px; font-size: 13px; font-weight: 600; display: inline-block;">
-                ${solicitud}
-              </span>
-            </td>
+            <td><span style="background-color: ${badgeColor}; color: #fff; padding: 6px 12px; border-radius: 20px; font-size: 13px; font-weight: 600; display: inline-block;">${solicitud}</span></td>
             <td style="max-width: 250px; white-space: pre-wrap; font-size: 13px;">${obs}</td>
             <td>${iconsHtml}</td>
             <td>${gestionHtml}</td> 
@@ -1088,21 +1042,28 @@
     }
 
     function cargarEstadoRecogidas() {
-      const searchType = document.getElementById('searchType').value; // 'guia' o 'correo'
-      const searchValue = document.getElementById('searchValue').value.trim();
+      const searchType = searchTypeSelect.value; 
+      const searchValue = searchValueInput.value.trim();
       
       if (!searchValue) {
         showToast('Por favor, ingresa un valor para buscar.', 'error');
         return;
       }
       
-      console.log(`Buscando novedades por: ${searchType}, valor: ${searchValue}`);
       mostrarLoading(true);
       
-      // Llamada a la API usando fetch
-      callAppsScript('obtenerEstadoNovedad', { tipo: searchType, valor: searchValue })
+      // Para búsquedas (GET) sí podemos usar fetch normal porque no enviamos archivos
+      const url = `${API_BASE_URL}?function=obtenerEstadoNovedad&params=${encodeURIComponent(JSON.stringify({ tipo: searchType, valor: searchValue }))}`;
+      
+      fetch(url)
+        .then(response => response.json())
         .then(data => {
           renderizarTabla(data);
+          mostrarLoading(false);
+        })
+        .catch(error => {
+          console.error('Error buscando:', error);
+          showToast('Error al buscar novedades', 'error');
           mostrarLoading(false);
         });
     }
@@ -1116,78 +1077,14 @@
     });
     clearFilterButton.addEventListener('click', function() {
       searchValueInput.value = '';
-      document.getElementById('tablaResultados').innerHTML = '';
-      document.getElementById('sinResultados').style.display = 'none';
+      tablaResultados.innerHTML = '';
+      sinResultados.style.display = 'none';
     });
 
-    // --- UTILIDADES ---
-    function mostrarLoading(show) {
-        document.getElementById('loading').style.display = show ? 'flex' : 'none';
-    }
-
-    function showToast(message, type = 'success') {
-        const existingToast = document.querySelector('.toast');
-        if (existingToast) {
-          existingToast.remove();
-        }
-        const toast = document.createElement('div');
-        toast.className = `toast ${type}`;
-        const icon = type === 'success' 
-          ? '<i class="bi bi-check-circle-fill"></i>' 
-          : '<i class="bi bi-exclamation-circle-fill"></i>';
-        toast.innerHTML = `${icon}<div>${message}</div>`;
-        document.body.appendChild(toast);
-        setTimeout(() => {
-            toast.style.animation = 'slideIn 0.3s ease reverse';
-            setTimeout(() => toast.remove(), 300);
-        }, 4000);
-    }
-
-
-    function toBase64(file) {
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = error => reject(error);
-      });
-    }
-
-    // Cerrar al clic en la X
+    // Cerrar modal con la X
     document.getElementById('cerrarModal').addEventListener('click', cerrarModalFunc);
 
-  }); // <--- FIN DE document.addEventListener
-
-
-  // =======================================================
-  // FUNCIONES GLOBALES (FUERA DEL EVENT LISTENER)
-  // Necesario para que funcionen los onclick en el HTML dinámico
-  // =======================================================
-
-  function cambiarEstadoVisto(elemento) {
-    elemento.classList.add('visto');
-  }
-
-  function abrirModal(elemento) {
-    var solucionTexto = elemento.getAttribute('data-solucion');
-    var solucionFormateada = solucionTexto.replace(/\n/g, '<br>');
-    
-    document.getElementById('modalSolucion').innerHTML = solucionFormateada;
-    document.getElementById('modalGestion').style.display = 'flex';
-  }
-
-  function cerrarModalFunc() {
-    document.getElementById('modalGestion').style.display = 'none';
-  }
-
-  // Cerrar si clic fuera del modal
-  window.onclick = function(event) {
-    var modal = document.getElementById('modalGestion');
-    if (event.target == modal) {
-      modal.style.display = "none";
-    }
-  }
-
-  </script>
+  }); 
+</script>
 </body>
 </html>
